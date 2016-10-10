@@ -10,6 +10,9 @@ import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -30,6 +33,8 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.yboweb.bestmovie.androidnavigationdrawerexample.R;
 
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -40,6 +45,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+;
 
 
 public class ScrollingActivity extends AppCompatActivity {
@@ -59,7 +66,8 @@ public class ScrollingActivity extends AppCompatActivity {
     private Activity activity = this;
     private static String  omdbId = null;
     private static String  shareTitle = null;
-
+    private Handler mHandler;
+    MovieDetails movieDetails = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,12 +75,13 @@ public class ScrollingActivity extends AppCompatActivity {
         setContentView(R.layout.activity_scrolling);
 
 
+        // EventBus.getDefault().register(this);
         Intent intentExtras = getIntent();
         Bundle extraBundle = intentExtras.getExtras();
 
 
         Bundle args = getIntent().getExtras();
-        mId  = args.getString("id");
+        mId = args.getString("id");
 
         imageUrl = args.getString("image_url");
         rating = args.getString("rating");
@@ -88,87 +97,247 @@ public class ScrollingActivity extends AppCompatActivity {
         final Activity activity = this;
 
 
-            int idInt = Integer.parseInt(mId);
+        int idInt = Integer.parseInt(mId);
 
-            ImdbConstants imdbConstants = ImdbConstants.getInstance();
-            String url = imdbConstants.getImagesUrl(idInt);
+        ImdbConstants imdbConstants = ImdbConstants.getInstance();
+        String url = imdbConstants.getImagesUrl(idInt);
 
 
 
             /* mGridView = (ListView) findViewById(R.id.scroll_detail_id1); */
-            mViewPager = (ViewPager) findViewById(R.id.scroll_detail_id);
-            mProgressBar = (ProgressBar) findViewById(R.id.detail_progress_bar);
-            mProgressBar.setVisibility(View.VISIBLE);
+        mViewPager = (ViewPager) findViewById(R.id.scroll_detail_id);
+        mProgressBar = (ProgressBar) findViewById(R.id.detail_progress_bar);
+        mProgressBar.setVisibility(View.VISIBLE);
 
-            //Initialize with empty data
-            mGridAdapter = new CustomPagerAdapter(activity);
-
-
-            topLinearLayout = new LinearLayout(this);
+        //Initialize with empty data
+        mGridAdapter = new CustomPagerAdapter(activity);
 
 
-            Log.d("DET_IMAGES", "URL:" + url);
-            RowImagesInputData m = new RowImagesInputData(url, activity, idInt, this, null, imdbConstants.GET_DETAILS);
+        topLinearLayout = new LinearLayout(this);
 
 
+        Log.d("DET_IMAGES", "URL:" + url);
+        final RowImagesInputData m = new RowImagesInputData(url, activity, idInt, this, null, imdbConstants.GET_DETAILS);
 
 
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-            topLinearLayout.setLayoutParams(params);
-            topLinearLayout.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+        topLinearLayout.setLayoutParams(params);
+        topLinearLayout.setOrientation(LinearLayout.HORIZONTAL);
 
 
+        if (mapString != null && imagesList != null) {
 
 
+            // We have the data in memory (favorites).
+            // This part draws the horizontal picture images
 
 
-        if(mapString != null && imagesList != null) {
+            List<String> items = Arrays.asList(imagesList.split("\\s*,\\s*"));
+            for (int i = 0; i < items.size(); i++) {
+                String fullImageURL = items.get(i);
+                ImageItem item = new ImageItem();
+                item.setImage(fullImageURL);
+                item.setTitle("title");
+                item.setVoting("voting");
+                item.setRating("rating");
+                item.setType(ImageItem.SCROLL_HORIZONTAL_ITEM);
+                mGridAdapter.addItem(item);
 
-
-                // We have the data in memory (favorites).
-                // This part draws the horizontal picture images
-
-
-                List<String> items = Arrays.asList(imagesList.split("\\s*,\\s*"));
-                for (int i = 0; i < items.size(); i++) {
-                    String fullImageURL = items.get(i);
-                    ImageItem item = new ImageItem();
-                    item.setImage(fullImageURL);
-                    item.setTitle("title");
-                    item.setVoting("voting");
-                    item.setRating("rating");
-                    item.setType(ImageItem.SCROLL_HORIZONTAL_ITEM);
-                    mGridAdapter.addItem(item);
-
-
-                }
-
-                mViewPager.setClipToPadding(false);
-                mViewPager.setPadding(0, 0, 0, 0);
-                mViewPager.setAdapter(mGridAdapter);
-
-                mProgressBar.setVisibility(View.INVISIBLE);
-
-                GetDetails getDetails = new GetDetails();
-                HashMap<String,String> map = new Gson().fromJson(mapString, new TypeToken<HashMap<String, String>>() {
-                }.getType());
-                Log.d("Scrolling", "Number of items:" + items.size());
-                LinearLayout layout = (LinearLayout) activity.findViewById(R.id.scroll_root_id);
-
-                // This part draws the rest of the page.
-                getDetails.drawDetails(layout, this, map, items.size(), items);
-
-
-
-
-        } else {
-            //The getImages calls to GetDetails
-                GetImages getImages = new GetImages();
-                getImages.execute(m);
 
             }
 
+            mViewPager.setClipToPadding(false);
+            mViewPager.setPadding(0, 0, 0, 0);
+            mViewPager.setAdapter(mGridAdapter);
+
+            mProgressBar.setVisibility(View.INVISIBLE);
+
+            GetDetails getDetails = new GetDetails();
+            HashMap<String, String> map = new Gson().fromJson(mapString, new TypeToken<HashMap<String, String>>() {
+            }.getType());
+            Log.d("Scrolling", "Number of items:" + items.size());
+            LinearLayout layout = (LinearLayout) activity.findViewById(R.id.scroll_root_id);
+
+            // This part draws the rest of the page.
+            getDetails.drawDetails(layout, this, map, items.size(), items);
+
+
+        } else {
+
+
+
+            Thread background = new Thread(new Runnable() {
+
+
+
+                // After call for background.start this run method call
+
+                public void run() {
+                    try {
+                        Looper.prepare();
+
+                        String SetServerString = "Hello world I am here";
+                        threadMsg(SetServerString);
+
+                    } catch (Throwable t) {
+                        // just end the background thread
+
+                        Log.i("Animation", "Thread  exception " + t);
+                    }
+                }
+
+
+                private void threadMsg(String msg) {
+
+                    if (!msg.equals(null) && !msg.equals("")) {
+                        Message msgObj = handler.obtainMessage();
+
+                        ReadURL imageUrl = new ReadURL();
+
+
+                        Boolean binary = Looper.myLooper() == Looper.getMainLooper();
+                        Log.d("threadMsg", "before readUrl" + "Mainthread is:" +binary);
+
+                        String url = m.getURL();
+
+                        List<Map<String, String>> myResult = new ArrayList<Map<String, String>>();
+
+                        int mContent = m.getType();
+                        ReadURL readURL = new ReadURL();
+                        StringBuffer readBuffer = readURL.Read(url);
+
+                        try {
+                            JSONObject jsonBuffer = new JSONObject(readBuffer.toString());
+                            String mContentJson;
+
+                            ImdbConstants  imdbConstObject = ImdbConstants.getInstance();
+
+                            if(mContent == imdbConstObject.GET_DETAILS) {
+                                mContentJson = "backdrops";
+                            }  else {
+                                mContentJson = "profiles";
+                            }
+
+                            JSONArray resultsArray = jsonBuffer.getJSONArray(mContentJson);
+
+
+                            Log.d("MostPopular", "Returned." + resultsArray.length());
+
+                             movieDetails = new MovieDetails(resultsArray, m);
+
+
+                        } catch (JSONException e) {
+                            Log.e("JSON: ", e.getMessage(), e);
+                            e.printStackTrace();
+                        }
+
+
+
+
+
+
+                        Bundle b = new Bundle();
+
+                       b.putString("message","Test message") ;
+                        msgObj.setData(b);
+                        handler.sendMessage(msgObj);
+                    }
+                }
+
+                // Define the Handler that receives messages from the thread and update the progress
+                private final Handler handler = new Handler() {
+
+                    public void handleMessage(Message msg) {
+
+
+                        String aResponse = msg.getData().getString("message");
+
+
+                        if ((null != aResponse)) {
+
+                            try {
+
+                                Boolean binary = Looper.myLooper() == Looper.getMainLooper();
+                                Log.d("threadMsg", "handleMessage" + "Mainthread is:" + binary);
+
+
+                                Log.d("threadMsg", "filename:" + aResponse);
+
+                                GetImages getImages = new GetImages();
+                                Log.d("ScrollingActivity", "Main: Calling to displayView");
+                                getImages.displayView(movieDetails);
+
+                                //EventBus.getDefault().post(new MessageEvent("Hello everyone!"));
+                                //Log.d("onMessageEvent", "event posted");
+
+
+
+
+                            } catch(Exception e) {
+                                e.getMessage();
+
+                            }
+
+                        }
+                        else
+                        {
+
+                            // ALERT MESSAGE
+                            Toast.makeText(
+                                    getBaseContext(),
+                                    "No Response From Server.",
+                                    Toast.LENGTH_SHORT).show();
+                        }
+
+                    }
+                };
+
+            });
+            // Start Thread
+            background.start();  //After call start method thread called run Method
+        };
+
+
+
+
+                //GetImages getImages = new GetImages();
+                // getImages.execute(m);
+
+            }
+
+
+
+
+    // Main thread recieve data from the background thread
+    /*
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onMessageEvent(MessageEvent event) {
+        Toast.makeText(getApplicationContext().getApplicationContext(), event.message, Toast.LENGTH_SHORT).show();
+        Log.d("onMessageEvent", "event recieved");
+    }
+*/
+    /*
+    @Override
+    public void onDestroy() {
+        EventBus.getDefault().unregister(this);
+        super.onDestroy();
+    }
+    */
+    void doJob() {
+        Runnable runnable = new Runnable() {
+            public void run() {
+                Message msg = mHandler.obtainMessage();
+                Bundle bundle = new Bundle();
+
+                bundle.putString("myKey", "Hello String");
+                msg.setData(bundle);
+                mHandler.sendMessage(msg);
+            }
+        };
+
+        Thread mythread = new Thread(runnable);
+        mythread.start();
     }
 
     private  String getOneImage(String fileName, String size) {
